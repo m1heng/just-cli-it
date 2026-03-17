@@ -2,6 +2,11 @@
 	"name": "@jcit/signoz",
 	"version": "0.1.0",
 	"description": "CLI for SigNoz observability platform",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/m1heng/just-cli-it.git",
+		"directory": "packages/signoz"
+	},
 	"type": "module",
 	"bin": {
 		"signoz": "./dist/cli.mjs"

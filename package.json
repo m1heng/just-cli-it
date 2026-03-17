@@ -2,6 +2,10 @@
 	"name": "just-cli-it",
 	"private": true,
 	"description": "CLI-ify everything \u2014 turn any API/service into a powerful CLI tool",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/m1heng/just-cli-it.git"
+	},
 	"packageManager": "pnpm@10.11.0",
 	"engines": {
 		"node": ">=22"

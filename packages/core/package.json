@@ -2,6 +2,11 @@
 	"name": "@jcit/core",
 	"version": "0.1.0",
 	"description": "Shared utilities for just-cli-it CLI tools",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/m1heng/just-cli-it.git",
+		"directory": "packages/core"
+	},
 	"type": "module",
 	"exports": {
 		".": {
