@@ -43,6 +43,13 @@ Every command must:
 
 Every CLI package has a `docsUrl`. Every subcommand has examples. Error messages are actionable — tell the user what to do. `installErrorHandler()` converts raw exceptions to human-friendly output (no stack traces).
 
+## CI/CD
+
+- **CI** (`.github/workflows/ci.yml`): runs on PRs and push to main — lint → build → test. Auto-cancels superseded runs.
+- **Release** (`.github/workflows/release.yml`): runs on push to main — changesets/action creates "Version Packages" PR when changesets exist, publishes to npm when merged. Requires `NPM_TOKEN` secret in repo settings.
+- Release uses npm provenance (`NPM_CONFIG_PROVENANCE=true`).
+- `pnpm version-packages` runs `changeset version` then `pnpm install --no-frozen-lockfile` to sync lockfile.
+
 ## Build
 
 unbuild, ESM-only. CLI packages list `src/index` + `src/cli` as entries. `#!/usr/bin/env node` on `src/cli.ts`.
