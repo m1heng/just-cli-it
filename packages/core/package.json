@@ -1,6 +1,6 @@
 {
 	"name": "@jcit/core",
-	"version": "0.0.1",
+	"version": "0.1.0",
 	"description": "Shared utilities for just-cli-it CLI tools",
 	"type": "module",
 	"exports": {
@@ -9,7 +9,9 @@
 			"types": "./dist/index.d.mts"
 		}
 	},
-	"files": ["dist"],
+	"files": [
+		"dist"
+	],
 	"scripts": {
 		"build": "unbuild",
 		"dev": "unbuild --stub"
