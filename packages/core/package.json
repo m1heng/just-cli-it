@@ -1,0 +1,25 @@
+{
+	"name": "@jcit/core",
+	"version": "0.0.1",
+	"description": "Shared utilities for just-cli-it CLI tools",
+	"type": "module",
+	"exports": {
+		".": {
+			"import": "./dist/index.mjs",
+			"types": "./dist/index.d.mts"
+		}
+	},
+	"files": ["dist"],
+	"scripts": {
+		"build": "unbuild",
+		"dev": "unbuild --stub"
+	},
+	"dependencies": {
+		"commander": "^14.0.0",
+		"consola": "^3.4.0",
+		"ofetch": "^1.4.1"
+	},
+	"devDependencies": {
+		"unbuild": "^3.3.1"
+	}
+}
