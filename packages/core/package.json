@@ -14,9 +14,7 @@
 			"types": "./dist/index.d.mts"
 		}
 	},
-	"files": [
-		"dist"
-	],
+	"files": ["dist"],
 	"scripts": {
 		"build": "unbuild",
 		"dev": "unbuild --stub"
