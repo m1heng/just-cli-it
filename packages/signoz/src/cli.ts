@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { createRequire } from "node:module";
 import { defineCliApp, installErrorHandler } from "@jcit/core";
 
 installErrorHandler();
@@ -7,9 +8,12 @@ import { registerAuth } from "./commands/auth";
 import { registerQuery } from "./commands/query";
 import { registerServices } from "./commands/services";
 
+const require = createRequire(import.meta.url);
+const { version } = require("../package.json");
+
 const program = defineCliApp({
 	name: "signoz",
-	version: "0.0.1",
+	version,
 	description: "CLI for SigNoz observability platform",
 	docsUrl: "https://github.com/m1heng/just-cli-it/tree/main/packages/signoz",
 });
