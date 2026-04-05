@@ -115,20 +115,19 @@ signoz query -f my-query.json --since 7d --until 1d
 
 #### File format for `-f`
 
-The JSON file should follow the SigNoz v3 `query_range` body format. The `start` and `end` fields are overridden by `--since`/`--until`:
+The JSON file should follow the SigNoz v5 `query_range` body format. The `start` and `end` fields are overridden by `--since`/`--until`:
 
 ```json
 {
+  "requestType": "time_series",
   "compositeQuery": {
-    "queryType": "promql",
-    "panelType": "time_series",
-    "promQueries": {
-      "A": { "query": "rate(http_requests_total[5m])", "disabled": false }
-    },
-    "chQueries": {},
-    "builderQueries": {}
-  },
-  "step": 60
+    "queries": [
+      {
+        "type": "promql",
+        "spec": { "name": "A", "query": "rate(http_requests_total[5m])", "step": 60, "disabled": false }
+      }
+    ]
+  }
 }
 ```
 
@@ -153,7 +152,7 @@ The CLI talks to these SigNoz API endpoints:
 
 | Command | Method | Endpoint |
 |---------|--------|----------|
-| `query` | POST | `/api/v3/query_range` |
+| `query` | POST | `/api/v5/query_range` |
 | `alerts` | GET | `/api/v1/rules` |
 | `services` | GET | `/api/v1/services/list` |
 
