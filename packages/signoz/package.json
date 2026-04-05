@@ -1,6 +1,6 @@
 {
 	"name": "@jcit/signoz",
-	"version": "0.2.0",
+	"version": "0.2.1",
 	"description": "CLI for SigNoz observability platform",
 	"repository": {
 		"type": "git",

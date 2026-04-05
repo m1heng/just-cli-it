@@ -1,5 +1,13 @@
 # @jcit/signoz
 
+## 0.2.1
+
+### Patch Changes
+
+- Fix --format table rendering [Object] for nested query results
+
+  Flatten v5 query_range series into one row per data point with label columns + ts + value, so table output is human-readable.
+
 ## 0.2.0
 
 ### Minor Changes
