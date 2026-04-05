@@ -33,19 +33,13 @@ export function buildPromqlRequest(
 	};
 }
 
-export function buildSqlRequest(
-	query: string,
-	start: number,
-	end: number,
-): QueryRangeRequest {
+export function buildSqlRequest(query: string, start: number, end: number): QueryRangeRequest {
 	return {
 		start,
 		end,
 		requestType: "time_series",
 		compositeQuery: {
-			queries: [
-				{ type: "clickhouse_sql", spec: { name: "A", query, disabled: false } },
-			],
+			queries: [{ type: "clickhouse_sql", spec: { name: "A", query, disabled: false } }],
 		},
 	};
 }

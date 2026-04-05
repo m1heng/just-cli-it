@@ -56,7 +56,16 @@ describe("v5 payload structure", () => {
 
 	it("has only valid top-level fields per v5 spec", () => {
 		const keys = Object.keys(req);
-		const validFields = ["schemaVersion", "start", "end", "requestType", "compositeQuery", "variables", "noCache", "formatOptions"];
+		const validFields = [
+			"schemaVersion",
+			"start",
+			"end",
+			"requestType",
+			"compositeQuery",
+			"variables",
+			"noCache",
+			"formatOptions",
+		];
 		for (const key of keys) {
 			expect(validFields).toContain(key);
 		}
