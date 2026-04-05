@@ -1,5 +1,11 @@
 # @jcit/signoz
 
+## 0.1.2
+
+### Patch Changes
+
+- 8f38687: Fix query command: switch to v3 API with correct compositeQuery format and nanosecond timestamps
+
 ## 0.1.1
 
 ### Patch Changes
