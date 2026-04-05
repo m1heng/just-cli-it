@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPromqlRequest, buildSqlRequest } from "./query";
+import { buildPromqlRequest, buildSqlRequest, flattenSeries } from "./query";
 
 const START = 1_700_000_000_000;
 const END = 1_700_003_600_000;
@@ -77,5 +77,58 @@ describe("v5 payload structure", () => {
 
 	it("compositeQuery contains only queries array", () => {
 		expect(Object.keys(req.compositeQuery)).toEqual(["queries"]);
+	});
+});
+
+describe("flattenSeries", () => {
+	it("flattens labels + values into one row per data point", () => {
+		const res = {
+			status: "success",
+			data: {
+				data: {
+					results: [
+						{
+							aggregations: [
+								{
+									series: [
+										{
+											labels: [{ key: { name: "severity_text" }, value: "WARN" }],
+											values: [
+												{ timestamp: 1_700_000_000_000, value: 14 },
+												{ timestamp: 1_700_003_600_000, value: 34 },
+											],
+										},
+									],
+								},
+							],
+						},
+					],
+				},
+			},
+		};
+		const rows = flattenSeries(res);
+		expect(rows).toHaveLength(2);
+		expect(rows[0]).toEqual({
+			ts: new Date(1_700_000_000_000).toISOString(),
+			severity_text: "WARN",
+			value: 14,
+		});
+		expect(rows[1].value).toBe(34);
+	});
+
+	it("returns empty array for null series", () => {
+		const res = {
+			status: "success",
+			data: {
+				data: {
+					results: [{ aggregations: [{ series: null }] }],
+				},
+			},
+		};
+		expect(flattenSeries(res)).toEqual([]);
+	});
+
+	it("returns empty array for missing data", () => {
+		expect(flattenSeries({ status: "success" })).toEqual([]);
 	});
 });

@@ -50,12 +50,27 @@ export function buildSqlRequest(query: string, start: number, end: number): Quer
 	};
 }
 
+interface SeriesLabel {
+	key: { name: string };
+	value: string;
+}
+
+interface SeriesValue {
+	timestamp: number;
+	value: number | string;
+}
+
+interface Series {
+	labels?: SeriesLabel[];
+	values?: SeriesValue[];
+}
+
 interface QueryRangeResponse {
 	status: string;
 	data?: {
 		data?: {
 			results?: Array<{
-				aggregations?: Array<{ series?: unknown[] | null }> | null;
+				aggregations?: Array<{ series?: Series[] | null }> | null;
 			}>;
 		};
 	};
@@ -65,6 +80,25 @@ function isEmptyResult(res: QueryRangeResponse): boolean {
 	const results = res.data?.data?.results;
 	if (!results) return true;
 	return results.every((r) => !r.aggregations?.some((a) => a.series && a.series.length > 0));
+}
+
+/** Flatten nested v5 query_range response into one row per data point. */
+export function flattenSeries(res: QueryRangeResponse): Record<string, unknown>[] {
+	const rows: Record<string, unknown>[] = [];
+	for (const result of res.data?.data?.results ?? []) {
+		for (const agg of result.aggregations ?? []) {
+			for (const s of agg.series ?? []) {
+				const labels: Record<string, string> = {};
+				for (const l of s.labels ?? []) {
+					labels[l.key.name] = l.value;
+				}
+				for (const v of s.values ?? []) {
+					rows.push({ ts: new Date(v.timestamp).toISOString(), ...labels, value: v.value });
+				}
+			}
+		}
+	}
+	return rows;
 }
 
 export function registerQuery(program: Command) {
@@ -112,7 +146,12 @@ export function registerQuery(program: Command) {
 			body,
 		});
 
-		formatOutput(result, opts.format as OutputFormat);
+		if (opts.format === "table") {
+			const rows = flattenSeries(result);
+			formatOutput(rows.length > 0 ? rows : result, "table" as OutputFormat);
+		} else {
+			formatOutput(result, opts.format as OutputFormat);
+		}
 
 		if (opts.promql && isEmptyResult(result)) {
 			consola.warn(
