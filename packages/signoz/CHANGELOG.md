@@ -1,5 +1,11 @@
 # @jcit/signoz
 
+## 0.1.3
+
+### Patch Changes
+
+- 5a703b0: Switch query command back to v5 API with correct payload format (requestType, compositeQuery.queries envelopes, millisecond timestamps)
+
 ## 0.1.2
 
 ### Patch Changes
