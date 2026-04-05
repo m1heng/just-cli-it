@@ -4,42 +4,52 @@ import type { Command } from "commander";
 import { createSignozClient } from "../client";
 import { parseSince, parseUntil } from "../utils/time";
 
+export const MS_TO_NS = 1_000_000;
+
 interface QueryRangeRequest {
 	start: number;
 	end: number;
-	requestType: string;
+	step?: number;
 	compositeQuery: {
-		queries: Array<{
-			type: string;
-			spec: Record<string, unknown>;
-		}>;
+		queryType: "promql" | "clickhouse" | "builder";
+		panelType: string;
+		promQueries: Record<string, { query: string; disabled: boolean; legend?: string }>;
+		chQueries: Record<string, { query: string; disabled: boolean; legend?: string }>;
+		builderQueries: Record<string, unknown>;
 	};
 	[key: string]: unknown;
 }
 
-function buildPromqlRequest(
+export function buildPromqlRequest(
 	query: string,
-	start: number,
-	end: number,
+	startNs: number,
+	endNs: number,
 	step: number,
 ): QueryRangeRequest {
 	return {
-		start,
-		end,
-		requestType: "time_series",
+		start: startNs,
+		end: endNs,
+		step,
 		compositeQuery: {
-			queries: [{ type: "promql", spec: { name: "A", query, step, disabled: false } }],
+			queryType: "promql",
+			panelType: "time_series",
+			promQueries: { A: { query, disabled: false } },
+			chQueries: {},
+			builderQueries: {},
 		},
 	};
 }
 
-function buildSqlRequest(query: string, start: number, end: number): QueryRangeRequest {
+export function buildSqlRequest(query: string, startNs: number, endNs: number): QueryRangeRequest {
 	return {
-		start,
-		end,
-		requestType: "time_series",
+		start: startNs,
+		end: endNs,
 		compositeQuery: {
-			queries: [{ type: "clickhouse_sql", spec: { name: "A", query, disabled: false } }],
+			queryType: "clickhouse",
+			panelType: "time_series",
+			chQueries: { A: { query, disabled: false } },
+			promQueries: {},
+			builderQueries: {},
 		},
 	};
 }
@@ -50,7 +60,7 @@ export function registerQuery(program: Command) {
 		.description("Query traces, logs, and metrics via the unified query API")
 		.option("--promql <expr>", "PromQL expression")
 		.option("--sql <query>", "ClickHouse SQL query (must include timestamp WHERE clause)")
-		.option("-f, --file <path>", "Load query from JSON file (v5 query_range format)")
+		.option("-f, --file <path>", "Load query from JSON file (v3 query_range format)")
 		.option("--since <time>", "Start time: duration ago (1h, 30m, 7d) or ISO date", "1h")
 		.option("--until <time>", "End time: 'now', duration ago, or ISO date", "now")
 		.option("--step <seconds>", "Step interval in seconds (PromQL only)", "60")
@@ -67,8 +77,8 @@ export function registerQuery(program: Command) {
 			}
 
 			const client = createSignozClient({ url: opts.url, token: opts.token });
-			const start = parseSince(opts.since);
-			const end = parseUntil(opts.until);
+			const startNs = parseSince(opts.since) * MS_TO_NS;
+			const endNs = parseUntil(opts.until) * MS_TO_NS;
 
 			let body: QueryRangeRequest;
 
@@ -77,16 +87,16 @@ export function registerQuery(program: Command) {
 				if (Number.isNaN(step) || step <= 0) {
 					cmd.error(`invalid --step value: "${opts.step}". Provide a positive number in seconds`);
 				}
-				body = buildPromqlRequest(opts.promql, start, end, step);
+				body = buildPromqlRequest(opts.promql, startNs, endNs, step);
 			} else if (opts.sql) {
-				body = buildSqlRequest(opts.sql, start, end);
+				body = buildSqlRequest(opts.sql, startNs, endNs);
 			} else {
 				body = JSON.parse(readFileSync(opts.file, "utf-8"));
-				body.start = start;
-				body.end = end;
+				body.start = startNs;
+				body.end = endNs;
 			}
 
-			const result = await client("/api/v5/query_range", {
+			const result = await client("/api/v3/query_range", {
 				method: "POST",
 				body,
 			});
@@ -96,8 +106,8 @@ export function registerQuery(program: Command) {
 
 	addExamples(cmd, [
 		"signoz query --promql 'rate(http_requests_total[5m])' --since 1h",
-		"signoz query --sql 'SELECT count(*) AS value FROM signoz_logs.distributed_logs_v2 WHERE timestamp >= ...'",
+		"signoz query --sql 'SELECT count(*) FROM signoz_logs.distributed_logs_v2 WHERE timestamp >= ...'",
 		"signoz query -f my-query.json --since 7d --until 1d",
-		"signoz query --promql 'up' --format table",
+		"signoz query --promql 'up' --format table --step 30",
 	]);
 }
