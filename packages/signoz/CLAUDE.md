@@ -17,7 +17,7 @@ SIGNOZ_TOKEN=xxx signoz alerts             # Env var override
 Base URL defaults to `http://localhost:3301` (no version prefix — different endpoints use different API versions).
 
 Key endpoints:
-- `POST /api/v5/query_range` — unified query (PromQL, ClickHouse SQL, builder). Timestamps in epoch milliseconds. Request body requires `requestType` field.
+- `POST /api/v3/query_range` — unified query (PromQL, ClickHouse SQL, builder). Timestamps in epoch **nanoseconds**. Request body uses `compositeQuery` with `queryType` ("promql" | "clickhouse" | "builder"), `panelType`, and query maps (`promQueries`, `chQueries`, `builderQueries`).
 - `GET /api/v1/rules` — alert rules
 - `GET /api/v1/services/list` — services
 
