@@ -4,52 +4,42 @@ import type { Command } from "commander";
 import { createSignozClient } from "../client";
 import { parseSince, parseUntil } from "../utils/time";
 
-export const MS_TO_NS = 1_000_000;
+interface QueryEnvelope {
+	type: string;
+	spec: Record<string, unknown>;
+}
 
 interface QueryRangeRequest {
 	start: number;
 	end: number;
-	step?: number;
-	compositeQuery: {
-		queryType: "promql" | "clickhouse" | "builder";
-		panelType: string;
-		promQueries: Record<string, { query: string; disabled: boolean; legend?: string }>;
-		chQueries: Record<string, { query: string; disabled: boolean; legend?: string }>;
-		builderQueries: Record<string, unknown>;
-	};
+	requestType: string;
+	compositeQuery: { queries: QueryEnvelope[] };
 	[key: string]: unknown;
 }
 
 export function buildPromqlRequest(
 	query: string,
-	startNs: number,
-	endNs: number,
+	start: number,
+	end: number,
 	step: number,
 ): QueryRangeRequest {
 	return {
-		start: startNs,
-		end: endNs,
-		step,
+		start,
+		end,
+		requestType: "time_series",
 		compositeQuery: {
-			queryType: "promql",
-			panelType: "time_series",
-			promQueries: { A: { query, disabled: false } },
-			chQueries: {},
-			builderQueries: {},
+			queries: [{ type: "promql", spec: { name: "A", query, step, disabled: false } }],
 		},
 	};
 }
 
-export function buildSqlRequest(query: string, startNs: number, endNs: number): QueryRangeRequest {
+export function buildSqlRequest(query: string, start: number, end: number): QueryRangeRequest {
 	return {
-		start: startNs,
-		end: endNs,
+		start,
+		end,
+		requestType: "time_series",
 		compositeQuery: {
-			queryType: "clickhouse",
-			panelType: "time_series",
-			chQueries: { A: { query, disabled: false } },
-			promQueries: {},
-			builderQueries: {},
+			queries: [{ type: "clickhouse_sql", spec: { name: "A", query, disabled: false } }],
 		},
 	};
 }
@@ -60,7 +50,7 @@ export function registerQuery(program: Command) {
 		.description("Query traces, logs, and metrics via the unified query API")
 		.option("--promql <expr>", "PromQL expression")
 		.option("--sql <query>", "ClickHouse SQL query (must include timestamp WHERE clause)")
-		.option("-f, --file <path>", "Load query from JSON file (v3 query_range format)")
+		.option("-f, --file <path>", "Load query from JSON file (v5 query_range format)")
 		.option("--since <time>", "Start time: duration ago (1h, 30m, 7d) or ISO date", "1h")
 		.option("--until <time>", "End time: 'now', duration ago, or ISO date", "now")
 		.option("--step <seconds>", "Step interval in seconds (PromQL only)", "60")
@@ -77,8 +67,8 @@ export function registerQuery(program: Command) {
 			}
 
 			const client = createSignozClient({ url: opts.url, token: opts.token });
-			const startNs = parseSince(opts.since) * MS_TO_NS;
-			const endNs = parseUntil(opts.until) * MS_TO_NS;
+			const start = parseSince(opts.since);
+			const end = parseUntil(opts.until);
 
 			let body: QueryRangeRequest;
 
@@ -87,16 +77,16 @@ export function registerQuery(program: Command) {
 				if (Number.isNaN(step) || step <= 0) {
 					cmd.error(`invalid --step value: "${opts.step}". Provide a positive number in seconds`);
 				}
-				body = buildPromqlRequest(opts.promql, startNs, endNs, step);
+				body = buildPromqlRequest(opts.promql, start, end, step);
 			} else if (opts.sql) {
-				body = buildSqlRequest(opts.sql, startNs, endNs);
+				body = buildSqlRequest(opts.sql, start, end);
 			} else {
 				body = JSON.parse(readFileSync(opts.file, "utf-8"));
-				body.start = startNs;
-				body.end = endNs;
+				body.start = start;
+				body.end = end;
 			}
 
-			const result = await client("/api/v3/query_range", {
+			const result = await client("/api/v5/query_range", {
 				method: "POST",
 				body,
 			});
