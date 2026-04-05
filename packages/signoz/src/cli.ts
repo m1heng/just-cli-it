@@ -5,6 +5,7 @@ import { defineCliApp, installErrorHandler } from "@jcit/core";
 installErrorHandler();
 import { registerAlerts } from "./commands/alerts";
 import { registerAuth } from "./commands/auth";
+import { registerMetrics } from "./commands/metrics";
 import { registerQuery } from "./commands/query";
 import { registerServices } from "./commands/services";
 
@@ -20,6 +21,7 @@ const program = defineCliApp({
 
 registerAuth(program);
 registerQuery(program);
+registerMetrics(program);
 registerAlerts(program);
 registerServices(program);
 

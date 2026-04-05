@@ -21,7 +21,7 @@ describe("buildPromqlRequest", () => {
 		expect(req.compositeQuery.queries).toHaveLength(1);
 		const q = req.compositeQuery.queries[0];
 		expect(q.type).toBe("promql");
-		expect(q.spec).toEqual({ name: "A", query: "up", step: 60, disabled: false });
+		expect(q.spec).toEqual({ name: "A", query: "up", step: 60, disabled: false, stats: false });
 	});
 
 	it("puts step inside spec, not at top level", () => {
@@ -69,6 +69,10 @@ describe("v5 payload structure", () => {
 		for (const key of keys) {
 			expect(validFields).toContain(key);
 		}
+	});
+
+	it("includes schemaVersion v1", () => {
+		expect(req.schemaVersion).toBe("v1");
 	});
 
 	it("compositeQuery contains only queries array", () => {

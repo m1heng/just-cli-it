@@ -65,7 +65,7 @@ Query traces, logs, and metrics. Supports three input modes (mutually exclusive)
 | Flag | Description |
 |------|-------------|
 | `--promql <expr>` | PromQL expression |
-| `--sql <query>` | ClickHouse SQL query (**must include timestamp WHERE clause** — see below) |
+| `--sql <query>` | ClickHouse SQL query (use `{{start_ms}}` etc. for time injection — see below) |
 | `-f, --file <path>` | Load full query_range JSON body from file |
 
 Time range, output, and auth options:
@@ -76,21 +76,37 @@ Time range, output, and auth options:
 | `--until <time>` | `now` | End time — `now`, duration ago, or ISO date |
 | `--step <seconds>` | `60` | Step interval in seconds (PromQL only, must be a positive number) |
 | `--format <format>` | `json` | Output: `json`, `table`, or `text` |
-| `--url <url>` | | SigNoz API base URL override |
-| `--token <token>` | | SigNoz API token override |
+
+> `--url` and `--token` flags are available on all commands for per-invocation auth override.
 
 > **Duration = "ago"**: `--since 1h` means "1 hour ago". `--until 1d` means "1 day ago" (not "for 1 day"). So `--since 7d --until 1d` queries from 7 days ago to 1 day ago.
 
-> **`--since`/`--until` only affect PromQL and file mode.** For `--sql`, you must write your own timestamp WHERE clause in the SQL — the `start`/`end` values are set in the request body but SigNoz does not auto-inject time filters into raw ClickHouse SQL.
+> **SQL time injection**: Use `{{start_ms}}`/`{{end_ms}}` (milliseconds), `{{start_ns}}`/`{{end_ns}}` (nanoseconds), or `{{start_s}}`/`{{end_s}}` (seconds) in your SQL. These are replaced with the values from `--since`/`--until` before the query is sent.
+
+#### PromQL limitations
+
+> **Delta-temporality metrics are not queryable via PromQL.** SigNoz's PromQL engine only supports Cumulative and Gauge metrics. Many SigNoz internal metrics (e.g. `signoz_calls_total`, `signoz_latency.*`) use Delta temporality and will return empty results. Use `--sql` for Delta metrics instead.
+
+> **OTel dot-separated metric names** (e.g. `http.client.request.duration.bucket`) are not valid PromQL identifiers. Use the `{__name__="..."}` selector syntax instead of bare metric names.
+
+To check a metric's temporality, use the `metrics` command (see below) or:
+
+```bash
+signoz metrics                          # List all metrics with temporality
+signoz metrics | jq '.[] | select(.promql == "no")'  # Show Delta-only metrics
+```
 
 #### PromQL examples
 
 ```bash
-# Request rate over the last hour
+# OTel metric with dot-separated name (Cumulative — works)
+signoz query --promql '{__name__="http.client.request.duration.bucket"}' --since 1h
+
+# Prometheus-style metric (if Cumulative)
 signoz query --promql 'rate(http_requests_total[5m])' --since 1h
 
 # Table output for quick scan
-signoz query --promql 'up' --format table
+signoz query --promql '{__name__="db.client.connections.usage"}' --format table
 
 # From a specific start date to now
 signoz query --promql 'process_cpu_seconds_total' --since 2024-01-15T00:00:00Z
@@ -99,13 +115,23 @@ signoz query --promql 'process_cpu_seconds_total' --since 2024-01-15T00:00:00Z
 #### ClickHouse SQL examples
 
 ```bash
-# Count logs from the last 24 hours (note: timestamp filter is IN the SQL)
-signoz query --sql "
+# Count logs from the last 24 hours — {{start_ns}}/{{end_ns}} injected from --since
+signoz query --since 24h --sql "
   SELECT toStartOfInterval(fromUnixTimestamp64Nano(timestamp), INTERVAL 1 HOUR) AS ts,
          count(*) AS value
   FROM signoz_logs.distributed_logs_v2
-  WHERE timestamp >= $(date -d '24 hours ago' +%s)000000000
-    AND timestamp <= $(date +%s)000000000
+  WHERE timestamp >= {{start_ns}} AND timestamp <= {{end_ns}}
+    AND ts_bucket_start >= {{start_s}} - 1800 AND ts_bucket_start <= {{end_s}}
+  GROUP BY ts ORDER BY ts
+"
+
+# Metric samples over the last hour
+signoz query --since 1h --sql "
+  SELECT toStartOfInterval(toDateTime(intDiv(unix_milli, 1000)), INTERVAL 1 MINUTE) AS ts,
+         avg(value) AS value
+  FROM signoz_metrics.distributed_samples_v4
+  WHERE metric_name = 'signoz_calls_total'
+    AND unix_milli >= {{start_ms}} AND unix_milli < {{end_ms}}
   GROUP BY ts ORDER BY ts
 "
 
@@ -119,31 +145,44 @@ The JSON file should follow the SigNoz v5 `query_range` body format. The `start`
 
 ```json
 {
+  "schemaVersion": "v1",
   "requestType": "time_series",
   "compositeQuery": {
     "queries": [
       {
         "type": "promql",
-        "spec": { "name": "A", "query": "rate(http_requests_total[5m])", "step": 60, "disabled": false }
+        "spec": { "name": "A", "query": "rate(http_requests_total[5m])", "step": 60, "disabled": false, "stats": false }
       }
     ]
   }
 }
 ```
 
+### metrics — Discover available metrics
+
+List all metrics with their temporality, type, and PromQL compatibility:
+
+```bash
+signoz metrics                          # JSON list of all metrics
+signoz metrics --format table           # Quick scan as table
+```
+
+Output fields: `name`, `temporality` (Cumulative/Delta/Unspecified), `type` (Sum/Gauge/Histogram), `unit`, `promql` (yes/no).
+
+Use this to determine which metrics can be queried via PromQL (Cumulative/Gauge only) and the exact metric name format.
+
 ### alerts — List alert rules
 
 ```bash
-signoz alerts                  # Human-readable text output
-signoz alerts --format json    # Machine-readable JSON
-signoz alerts --url https://signoz.example.com --token sk-xxx
+signoz alerts                  # JSON output (default)
+signoz alerts --format table   # Table output
 ```
 
 ### services — List services
 
 ```bash
-signoz services                # Human-readable text output
-signoz services --format json  # Machine-readable JSON
+signoz services                # JSON output (default)
+signoz services --format table # Table output
 ```
 
 ## API Endpoints
@@ -153,6 +192,7 @@ The CLI talks to these SigNoz API endpoints:
 | Command | Method | Endpoint |
 |---------|--------|----------|
 | `query` | POST | `/api/v5/query_range` |
+| `metrics` | POST | `/api/v5/query_range` (SQL against `distributed_metadata`) |
 | `alerts` | GET | `/api/v1/rules` |
 | `services` | GET | `/api/v1/services/list` |
 
@@ -216,44 +256,50 @@ SigNoz expects specific column names in ClickHouse SQL results:
 
 #### Logs — Count by severity (last 1 hour)
 
-```sql
-SELECT toStartOfInterval(fromUnixTimestamp64Nano(timestamp), INTERVAL 1 MINUTE) AS ts,
-       severity_text,
-       count(*) AS value
-FROM signoz_logs.distributed_logs_v2
-WHERE timestamp >= {startNano} AND timestamp <= {endNano}
-  AND ts_bucket_start >= {startSec - 1800} AND ts_bucket_start <= {endSec}
-GROUP BY ts, severity_text
-ORDER BY ts
+```bash
+signoz query --since 1h --sql "
+  SELECT toStartOfInterval(fromUnixTimestamp64Nano(timestamp), INTERVAL 1 MINUTE) AS ts,
+         severity_text,
+         count(*) AS value
+  FROM signoz_logs.distributed_logs_v2
+  WHERE timestamp >= {{start_ns}} AND timestamp <= {{end_ns}}
+    AND ts_bucket_start >= {{start_s}} - 1800 AND ts_bucket_start <= {{end_s}}
+  GROUP BY ts, severity_text
+  ORDER BY ts
+"
 ```
 
 Key log columns: `severity_text` (INFO/ERROR/...), `severity_number`, `body` (message), `trace_id`, `span_id`, `scope_name`.
 
 #### Traces — P99 latency by service (last 1 hour)
 
-```sql
-SELECT toStartOfInterval(timestamp, INTERVAL 1 MINUTE) AS ts,
-       resource_string_service$$name AS service,
-       quantile(0.99)(duration_nano) / 1e6 AS value
-FROM signoz_traces.distributed_signoz_index_v3
-WHERE timestamp >= '{startNano}' AND timestamp <= '{endNano}'
-  AND ts_bucket_start >= {startSec - 1800} AND ts_bucket_start <= {endSec}
-GROUP BY ts, service
-ORDER BY ts
+```bash
+signoz query --since 1h --sql "
+  SELECT toStartOfInterval(timestamp, INTERVAL 1 MINUTE) AS ts,
+         resource_string_service\$\$name AS service,
+         quantile(0.99)(duration_nano) / 1e6 AS value
+  FROM signoz_traces.distributed_signoz_index_v3
+  WHERE timestamp >= '{{start_ns}}' AND timestamp <= '{{end_ns}}'
+    AND ts_bucket_start >= {{start_s}} - 1800 AND ts_bucket_start <= {{end_s}}
+  GROUP BY ts, service
+  ORDER BY ts
+"
 ```
 
 Key trace columns: `name` (span name), `kind_string`, `duration_nano` (Float64, nanoseconds), `status_code` (0=unset, 1=ok, 2=error), `has_error` (Bool), `resource_string_service$$name` (service name — note `$$` encodes `.`).
 
 #### Metrics — Average metric value (last 1 hour)
 
-```sql
-SELECT toStartOfInterval(toDateTime(intDiv(unix_milli, 1000)), INTERVAL 1 MINUTE) AS ts,
-       avg(value) AS value
-FROM signoz_metrics.distributed_samples_v4
-WHERE metric_name = 'http_requests_total'
-  AND unix_milli >= {startMs} AND unix_milli < {endMs}
-GROUP BY ts
-ORDER BY ts
+```bash
+signoz query --since 1h --sql "
+  SELECT toStartOfInterval(toDateTime(intDiv(unix_milli, 1000)), INTERVAL 1 MINUTE) AS ts,
+         avg(value) AS value
+  FROM signoz_metrics.distributed_samples_v4
+  WHERE metric_name = 'http_requests_total'
+    AND unix_milli >= {{start_ms}} AND unix_milli < {{end_ms}}
+  GROUP BY ts
+  ORDER BY ts
+"
 ```
 
 ### Attribute Access (Map Columns)
@@ -283,7 +329,8 @@ mapContains(attributes_string, 'http.method')
 | `signoz_logs` | `distributed_logs_v2_resource` | Log resource attributes (join via `resource_fingerprint`) |
 | `signoz_traces` | `distributed_traces_v3_resource` | Trace resource attributes |
 | `signoz_traces` | `distributed_top_level_operations` | Top-level operation lookup |
-| `signoz_metrics` | `distributed_time_series_v4` | Metric time series metadata |
+| `signoz_metrics` | `distributed_metadata` | Metric metadata (name, temporality, type, unit) |
+| `signoz_metrics` | `distributed_time_series_v4` | Metric time series metadata (fingerprints, labels) |
 | `signoz_metrics` | `distributed_samples_v4_agg_5m` | 5-minute pre-aggregated metrics |
 | `signoz_metrics` | `distributed_samples_v4_agg_30m` | 30-minute pre-aggregated metrics |
 
@@ -297,5 +344,6 @@ Use `GLOBAL IN` (not `IN`) when joining with resource tables in distributed quer
 | Connection refused | Check that SigNoz is running at the configured URL |
 | 401 Unauthorized | Verify your API token is valid |
 | Query timeout | Add `ts_bucket_start` filter to your SQL WHERE clause |
-| Empty results with `--sql` | Ensure your SQL has timestamp WHERE clause — `--since`/`--until` don't filter SQL |
+| Empty results with `--sql` | Use `{{start_ms}}`/`{{end_ms}}` etc. in your SQL WHERE clause — see time injection docs above |
+| PromQL returns empty / `series: null` | Metric may use Delta temporality (not supported by PromQL engine) — use `--sql` instead. Or metric uses OTel dot-separated name — use `{__name__="metric.name"}` syntax |
 | invalid --step value | `--step` must be a positive number in seconds (e.g., `60`, not `1m`) |

@@ -37,3 +37,25 @@ export function parseUntil(input: string): number {
 	if (input === "now") return Date.now();
 	return parseSince(input);
 }
+
+/**
+ * Replace time template variables in a SQL string.
+ *
+ *   {{start_ms}} / {{end_ms}}  — epoch milliseconds (metrics: unix_milli)
+ *   {{start_ns}} / {{end_ns}}  — epoch nanoseconds  (logs: timestamp)
+ *   {{start_s}}  / {{end_s}}   — epoch seconds       (traces: ts_bucket_start)
+ */
+export function injectTimeVars(sql: string, startMs: number, endMs: number): string {
+	const startS = Math.floor(startMs / 1_000);
+	const endS = Math.floor(endMs / 1_000);
+	const startNs = BigInt(startMs) * 1_000_000n;
+	const endNs = BigInt(endMs) * 1_000_000n;
+
+	return sql
+		.replaceAll("{{start_ms}}", String(startMs))
+		.replaceAll("{{end_ms}}", String(endMs))
+		.replaceAll("{{start_s}}", String(startS))
+		.replaceAll("{{end_s}}", String(endS))
+		.replaceAll("{{start_ns}}", String(startNs))
+		.replaceAll("{{end_ns}}", String(endNs));
+}
