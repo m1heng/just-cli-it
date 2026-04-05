@@ -1,5 +1,18 @@
 # @jcit/signoz
 
+## 0.2.0
+
+### Minor Changes
+
+- Add SQL time variable injection, metrics discovery command, and DRY common options
+
+  - SQL queries now support `{{start_ms}}`, `{{end_ms}}`, `{{start_ns}}`, `{{end_ns}}`, `{{start_s}}`, `{{end_s}}` template variables, replaced from `--since`/`--until` before sending
+  - New `signoz metrics` command lists available metrics with temporality, type, and PromQL compatibility
+  - Extract `--format`/`--url`/`--token` into shared `addCommonOptions()` helper; unify `--format` default to `json`; hide `--url`/`--token` from help
+  - Fix PromQL payload: add `schemaVersion: "v1"` and `stats: false` to match SigNoz frontend format
+  - Warn when PromQL returns empty results (Delta temporality not supported)
+  - Inject `schemaVersion` into file-mode queries when missing
+
 ## 0.1.3
 
 ### Patch Changes
