@@ -1,0 +1,33 @@
+{
+	"name": "@jcit/posthog",
+	"version": "0.1.0",
+	"description": "CLI for PostHog product analytics platform",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/m1heng/just-cli-it.git",
+		"directory": "packages/posthog"
+	},
+	"type": "module",
+	"bin": {
+		"posthog-cli-it": "./dist/cli.mjs"
+	},
+	"exports": {
+		".": {
+			"import": "./dist/index.mjs",
+			"types": "./dist/index.d.mts"
+		}
+	},
+	"files": ["dist"],
+	"scripts": {
+		"build": "unbuild",
+		"dev": "unbuild --stub"
+	},
+	"dependencies": {
+		"@jcit/core": "workspace:*",
+		"commander": "^14.0.0",
+		"consola": "^3.4.0"
+	},
+	"devDependencies": {
+		"unbuild": "^3.3.1"
+	}
+}
