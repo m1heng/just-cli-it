@@ -23,7 +23,7 @@ Key endpoints:
 
 PromQL limitations: **Delta-temporality metrics return empty results** — the PromQL engine only supports Cumulative and Gauge. SigNoz internal metrics (`signoz_calls_total`, `signoz_latency.*`) are Delta. OTel dot-separated names require `{__name__="..."}` syntax. Check temporality via `distributed_metadata` table.
 
-ClickHouse SQL notes: `--sql` supports time variable injection — `{{start_ms}}`/`{{end_ms}}` (ms), `{{start_ns}}`/`{{end_ns}}` (ns), `{{start_s}}`/`{{end_s}}` (s) are replaced from `--since`/`--until` before sending. Tables: `signoz_logs.distributed_logs_v2` (timestamp in nanoseconds), `signoz_traces.distributed_signoz_index_v3` (DateTime64(9), quote values), `signoz_metrics.distributed_samples_v4` (unix_milli). Always include `ts_bucket_start` filter for logs/traces.
+ClickHouse SQL notes: `--sql` supports time variable injection — `{{start_ms}}`/`{{end_ms}}` (ms), `{{start_ns}}`/`{{end_ns}}` (ns), `{{start_s}}`/`{{end_s}}` (s) are replaced from `--since`/`--until` before sending. Use `--request-type raw --format table` for raw log rows; default SQL request type remains `time_series`. Tables: `signoz_logs.distributed_logs_v2` (timestamp in nanoseconds), `signoz_traces.distributed_signoz_index_v3` (DateTime64(9), quote values), `signoz_metrics.distributed_samples_v4` (unix_milli). Always include `ts_bucket_start` filter for logs/traces.
 
 ## Commands
 

@@ -75,6 +75,7 @@ Time range, output, and auth options:
 | `--since <time>` | `1h` | Start time — duration ago (`1h`, `30m`, `7d`) or ISO date |
 | `--until <time>` | `now` | End time — `now`, duration ago, or ISO date |
 | `--step <seconds>` | `60` | Step interval in seconds (PromQL only, must be a positive number) |
+| `--request-type <type>` | `time_series` | SQL/file result type: `time_series`, `scalar`, `raw`, or `trace` |
 | `--format <format>` | `json` | Output: `json`, `table`, or `text` |
 
 > `--url` and `--token` flags are available on all commands for per-invocation auth override.
@@ -123,6 +124,15 @@ signoz query --since 24h --sql "
   WHERE timestamp >= {{start_ns}} AND timestamp <= {{end_ns}}
     AND ts_bucket_start >= {{start_s}} - 1800 AND ts_bucket_start <= {{end_s}}
   GROUP BY ts ORDER BY ts
+"
+
+# Recent raw log rows as a readable table
+signoz query --since 1h --request-type raw --format table --sql "
+  SELECT timestamp, severity_text, body, trace_id, span_id
+  FROM signoz_logs.distributed_logs_v2
+  WHERE timestamp >= {{start_ns}} AND timestamp <= {{end_ns}}
+    AND ts_bucket_start >= {{start_s}} - 1800 AND ts_bucket_start <= {{end_s}}
+  ORDER BY timestamp DESC LIMIT 20
 "
 
 # Metric samples over the last hour
