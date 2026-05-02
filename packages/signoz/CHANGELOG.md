@@ -1,5 +1,13 @@
 # @jcit/signoz
 
+## 0.2.2
+
+### Patch Changes
+
+- 65bc814: Improve table/text output for nested values and flatten SigNoz v5 query results for time-series, scalar, and raw log responses.
+- Updated dependencies [65bc814]
+  - @jcit/core@0.1.1
+
 ## 0.2.1
 
 ### Patch Changes
